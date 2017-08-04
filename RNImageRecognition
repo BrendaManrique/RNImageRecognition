@@ -1,0 +1,268 @@
+/**
+* React Native Image Reconition
+* Author: Brenda Stephanie
+*/
+
+import React, { Component } from 'react';
+import {
+ AppRegistry,
+ Dimensions,
+ StyleSheet,
+ Text,
+ TouchableHighlight,
+ View,
+ TouchableOpacity,
+ ImageBackground,
+ ListView
+} from 'react-native';
+
+import Camera from 'react-native-camera';
+
+
+import RNFetchBlob from 'react-native-fetch-blob';
+//import Detector from './components/Connection';
+
+var ResultItem = React.createClass({
+ render: function() {
+   return (
+     <TouchableOpacity
+       onPress={this._pressListen}>
+       <Text
+         style={{textAlign:'left',color:'#ffffff',marginLeft:15}}>
+         {parseInt(this.props.resultIndex)+1}. {this.props.result}
+       </Text>
+     </TouchableOpacity>
+   )
+ },
+ _pressListen() {
+   this.props.listenByIndex(this.props.resultIndex);
+ }
+})
+
+export default class invip extends Component {
+ constructor(props) {
+   super(props);
+   this.state = {
+     cameraType: Camera.constants.Type.back,
+     capturedImage: null,
+     isUploading: false,
+     uploadProgress: 0,
+     showResult: false,
+     results: null
+   };
+ }
+
+ render() {
+   console.log("captured....",this.state.capturedImage);
+   var resultView = [];
+   if(this.state.capturedImage){
+      if(!this.state.results) {
+       resultView = <Text style={{color:'#ffffff',fontSize:25,textAlign:'center'}}>Try again...</Text>
+     }else{
+       resultView = <Text style={{color:'#ffffff',margin:15}}>{this.state.results}</Text>
+       /*for(var result_i = 0; result_i < this.state.results.length; result_i++) {
+         resultView.push(
+           <ResultItem
+             key={result_i}
+             resultIndex={result_i}
+             listenByIndex={this._listenByIndex}
+             result={this.state.results[result_i]} />
+         )
+       }*/
+     }
+   }
+
+   const mainButton = <TouchableHighlight
+           underlayColor={'#128f76'}
+           style={styles.invipButton}
+           onPress={this._takePicture.bind(this)}>
+           <Text style={styles.invipButtonText}>INVIP CAMERA</Text>
+         </TouchableHighlight>;
+
+   return (
+     <Camera
+         ref={(cam) => {
+           this.camera = cam;
+         }}
+         style={styles.container}
+         aspect={Camera.constants.Aspect.fill}
+         captureTarget={Camera.constants.CaptureTarget.disk}
+         onBarCodeRead={this._onBarCodeRead}
+         type={this.state.cameraType}>
+     
+
+       { !this.state.capturedImage  ?
+          mainButton :
+         <ImageBackground
+           style={styles.container}
+           source={{uri: this.state.capturedImage } }>
+           <View style={{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:'rgba(0,0,0,0)'}}>
+             <View style={{width:200,height:300,backgroundColor:'rgba(0,0,0,0.3)',justifyContent:'space-between'}}>
+               <Text style={{color:'#ffffff',margin:15}}>Description:</Text>
+               <View >
+                 {!this.state.results ?
+                     <Text>Analyzing...</Text> :
+                     resultView
+                 }
+                <TouchableHighlight
+                   underlayColor={'#ffffff'}
+                   style={styles.invipButton}
+                   onPress={this._backToTakePicture.bind(this)}>
+                   <Text  style={styles.invipButtonText}>RESET</Text>
+                 </TouchableHighlight> 
+               </View>
+             </View>
+           </View>
+         
+         </ImageBackground>
+       }
+     </Camera>
+   );
+ }
+
+ /*<View
+                 style={styles.detailActions}>
+               
+                 <TouchableHighlight
+                   underlayColor={'#1a242f'}
+                   style={styles.listenButton}
+                   onPress={this._listen.bind(this)}>
+                   <Text
+                     style={styles.listenButtonText}>LISTEN</Text>
+                 </TouchableHighlight>
+               </View> */
+
+ _onBarCodeRead(e) {
+   console.log(e);
+ }
+
+ _listen() {
+   console.log("listening...");
+    
+ }
+  _takePicture() {
+   const options = {};
+
+   this.camera.capture({metadata: options})
+     .then((data) => {
+       console.log(data);
+       this.setState({
+         capturedImage: data.path || null
+       });
+       this._detectImage(data) })
+     .catch(err => console.error(err));
+ }
+  
+
+
+ _detectImage(data) {
+   RNFetchBlob.fetch('POST', 'http://52.87.171.158:8000/api/classify', {
+       'Accept': 'application/json',
+       'Content-Type': 'application/octet-stream',
+       //'Ocp-Apim-Subscription-Key': '6c863d567f2a4a6b94b5fdcb11cc4bf1'
+   }, RNFetchBlob.wrap(data.path))
+   .then((res) => {
+     console.log("1...",res.json());
+      
+       return res.json();  
+       //let result =  res.json();
+       //this.setState({ result });
+
+       /* { categories:
+  [ { name: 'abstract_', score: 0.01171875 },
+    { name: 'others_', score: 0.07421875 } ],
+ requestId: 'ae16b8e3-fe13-426e-bc1a-b0b46668b3f9',
+ metadata: { width: 480, height: 853, format: 'Jpeg' } } */
+      
+   })
+   .then((json) => {
+        
+       /*if(json.hasOwnProperty('categories')){
+          
+           console.log("2...",json); 
+       }else{
+           alert("Sorry, I can't see any faces in there.");
+       } */
+       console.log("2...", JSON.stringify(json));
+       this.setState({
+           results:  JSON.stringify(json)
+         })
+      /* this.setState({
+               result: json.categories[0].name
+           });*/
+       return json;
+   })
+   .catch (function (error) {
+       console.log(error);
+       alert('Sorry, the request failed. Please try again.' + JSON.stringify(error));
+   });
+ }
+  _backToTakePicture() {
+   console.log("3... RESET");
+
+   this.setState({
+     capturedImage: null,
+     results: null
+   });
+ }
+
+}
+
+var styles = StyleSheet.create({
+ container: {
+   flex: 1,
+   justifyContent: 'flex-end',
+   flexDirection: 'column',
+   alignItems: 'stretch',
+   backgroundColor: '#F5FCFF',
+ },
+ invipButton: {
+   backgroundColor: '#50d2c2',
+   padding: 25
+ },
+ invipButtonText: {
+   color: '#ffffff',
+   fontSize: 18,
+   textAlign: 'center'
+ },
+ detailActions: {
+   flexDirection: 'row',
+   alignItems: 'stretch'
+ },
+ languageButton: {
+   flex:1,
+   backgroundColor: '#95a5a6',
+   padding: 15
+ },
+ languageButtonText: {
+   color: '#ffffff',
+   fontSize: 15,
+   textAlign: 'center'
+ },
+ listenButton: {
+   flex:1,
+   backgroundColor: '#2c3e50',
+   padding: 15
+ },
+ listenButtonText: {
+   color: '#ffffff',
+   fontSize: 15,
+   textAlign: 'center'
+ },
+ translationBox: {
+
+ },
+ welcome: {
+   fontSize: 20,
+   textAlign: 'center',
+   margin: 10,
+ },
+ instructions: {
+   textAlign: 'center',
+   color: '#333333',
+   marginBottom: 5,
+ },
+});
+
+AppRegistry.registerComponent('invip', () => invip);
+
